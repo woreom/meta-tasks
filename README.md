@@ -1,7 +1,7 @@
 # Meta-Tasks: An alternative view on Meta-Learning Regularization
 --------
 
-This repository is the official PyTorch implementation of the paper "Meta-Tasks: Improving Robustness in Few-Shot Classification with Unsupervised and Semi-supervised Learning" by Mohammad Rostami, Atik Faysal, Huaxia wang, Avimanyu Sahoo, Ryan Antle. 
+This repository is the official PyTorch implementation of the paper "Meta-Tasks: An alternative view on Meta-Learning Regularization" by Mohammad Rostami, Atik Faysal, Huaxia wang, Avimanyu Sahoo, Ryan Antle. 
 
 --------
 
