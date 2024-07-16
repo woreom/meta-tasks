@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import argparse
+from collections import OrderedDict
 
+import random
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -19,6 +21,15 @@ from utils import pprint, set_gpu, Timer, count_accuracy, log
 
 import numpy as np
 import os
+
+
+state = 42
+torch.manual_seed(state)
+torch.cuda.manual_seed(state)
+np.random.seed(state)
+random.seed(state)
+torch.backends.cudnn.enabled=False
+torch.backends.cudnn.deterministic=True
 
 def get_model(options):
     # Choose the embedding network
@@ -80,7 +91,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', default='0')
     parser.add_argument('--load', default='./experiments/exp_1/best_model.pth',
                             help='path of the checkpoint file')
-    parser.add_argument('--episode', type=int, default=1000,
+    parser.add_argument('--episode', type=int, default=5000,
                             help='number of episodes to test')
     parser.add_argument('--way', type=int, default=5,
                             help='number of classes in one test episode')
@@ -96,6 +107,40 @@ if __name__ == '__main__':
                             help='choose which classification head to use. miniImageNet, tieredImageNet, CIFAR_FS, FC100')
 
     opt = parser.parse_args()
+
+    set_gpu(opt.gpu)
+    
+    log_file_path = os.path.join(os.path.dirname(opt.load), "test_log.txt")
+    log(log_file_path, str(vars(opt)))
+
+    # Define the models
+    (embedding_net, cls_head) = get_model(opt)
+    
+    # Load saved model checkpoints
+    saved_models = torch.load(opt.load)
+
+    try:
+        embedding_net.load_state_dict(saved_models['embedding'])
+        embedding_net.eval()
+        cls_head.load_state_dict(saved_models['head'])
+        cls_head.eval()
+    
+    except Exception as e:
+
+        new_state_dict = OrderedDict()
+        new_state_dict['embedding'] = OrderedDict()
+        for k, v in saved_models['embedding'].items():
+            name = k[7:] # remove `module.`
+            new_state_dict['embedding'][name] = v
+
+        new_state_dict['head'] = saved_models['head']
+        
+        embedding_net.load_state_dict(new_state_dict['embedding'])
+        embedding_net.eval()
+        cls_head.load_state_dict(new_state_dict['head'])
+        cls_head.eval()
+    
+
     (dataset_test, data_loader) = get_dataset(opt)
 
     dloader_test = data_loader(
@@ -110,20 +155,6 @@ if __name__ == '__main__':
         epoch_size=opt.episode, # num of batches per epoch
     )
 
-    set_gpu(opt.gpu)
-    
-    log_file_path = os.path.join(os.path.dirname(opt.load), "test_log.txt")
-    log(log_file_path, str(vars(opt)))
-
-    # Define the models
-    (embedding_net, cls_head) = get_model(opt)
-    
-    # Load saved model checkpoints
-    saved_models = torch.load(opt.load)
-    embedding_net.load_state_dict(saved_models['embedding'])
-    embedding_net.eval()
-    cls_head.load_state_dict(saved_models['head'])
-    cls_head.eval()
     
     # Evaluate on test set
     test_accuracies = []
@@ -154,3 +185,6 @@ if __name__ == '__main__':
         if i % 50 == 0:
             print('Episode [{}/{}]:\t\t\tAccuracy: {:.2f} ± {:.2f} % ({:.2f} %)'\
                   .format(i, opt.episode, avg, ci95, acc))
+    log(log_file_path, 'Episode [{}/{}]:\t\t\tAccuracy: {:.2f} ± {:.2f} % ({:.2f} %)'\
+                  .format(i, opt.episode, avg, ci95, acc))
+

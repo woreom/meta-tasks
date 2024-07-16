@@ -27,7 +27,7 @@ from pdb import set_trace as breakpoint
 
 
 # Set the appropriate paths of the datasets here.
-_TIERED_IMAGENET_DATASET_DIR = '../datasets/tiered_imagenet/'
+_TIERED_IMAGENET_DATASET_DIR = '../../datasets/tiered_imagenet/'
 
 def buildLabelIndex(labels):
     label2inds = {}

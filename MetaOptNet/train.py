@@ -1,13 +1,17 @@
 # -*- coding: utf-8 -*-
 import os
 import argparse
+from distutils.util import strtobool
+
 import random
 import numpy as np
 from tqdm import tqdm
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
+from torchvision import datasets, transforms
 
 from models.classification_heads import ClassificationHead
 from models.R2D2_embedding import R2D2Embedding
@@ -15,6 +19,133 @@ from models.protonet_embedding import ProtoNetEmbedding
 from models.ResNet12_embedding import resnet12
 
 from utils import set_gpu, Timer, count_accuracy, check_dir, log
+
+
+state = 42
+torch.manual_seed(state)
+torch.cuda.manual_seed(state)
+np.random.seed(state)
+random.seed(state)
+torch.backends.cudnn.enabled=False
+torch.backends.cudnn.deterministic=True
+
+class DecoderResidualLayer(nn.Module):
+
+    def __init__(self, hidden_channels: int, output_channels: int, upsample: bool):
+        super(DecoderResidualLayer, self).__init__()
+
+        self.weight_layer1 = nn.Sequential(
+            nn.BatchNorm2d(num_features=hidden_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=hidden_channels, out_channels=hidden_channels, kernel_size=3,
+                      stride=1, padding=1, bias=False),
+        )
+
+        if upsample:
+            self.weight_layer2 = nn.Sequential(
+                nn.BatchNorm2d(num_features=hidden_channels),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(in_channels=hidden_channels, out_channels=output_channels, kernel_size=3,
+                                   stride=2, padding=1, output_padding=1, bias=False)                
+            )
+        else:
+            self.weight_layer2 = nn.Sequential(
+                nn.BatchNorm2d(num_features=hidden_channels),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(in_channels=hidden_channels, out_channels=output_channels, kernel_size=3,
+                          stride=1, padding=1, bias=False),
+            )
+
+        if upsample:
+            self.upsample = nn.Sequential(
+                nn.BatchNorm2d(num_features=hidden_channels),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(in_channels=hidden_channels, out_channels=output_channels, kernel_size=1,
+                                   stride=2, output_padding=1, bias=False)   
+            )
+        else:
+            self.upsample = None
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        identity = x
+
+        x = self.weight_layer1(x)
+        x = self.weight_layer2(x)
+
+        if self.upsample is not None:
+            identity = self.upsample(identity)
+
+        x = x + identity
+
+        return x
+    
+class DecoderResidualBlock(nn.Module):
+
+    def __init__(self, hidden_channels: int, output_channels: int, layers: int):
+        super(DecoderResidualBlock, self).__init__()
+
+        for i in range(layers):
+
+            if i == layers - 1:
+                layer = DecoderResidualLayer(hidden_channels=hidden_channels, output_channels=output_channels,
+                                             upsample=True)
+            else:
+                layer = DecoderResidualLayer(hidden_channels=hidden_channels, output_channels=hidden_channels,
+                                             upsample=False)
+            
+            self.add_module('%02d EncoderLayer' % i, layer)
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        for name, layer in self.named_children():
+
+            x = layer(x)
+
+        return x
+
+class ResNet12Decoder(nn.Module):
+    def __init__(self):
+        super(ResNet12Decoder, self).__init__()
+        configs = [1, 2, 2, 2]
+        # self.linear = nn.Linear(in_features=512, out_features=512*3*3)
+        self.conv1 = DecoderResidualBlock(hidden_channels=640, output_channels=320, layers=configs[0])
+        self.conv2 = DecoderResidualBlock(hidden_channels=320, output_channels=160, layers=configs[1])
+        self.conv3 = DecoderResidualBlock(hidden_channels=160, output_channels=64,  layers=configs[2])
+        # self.conv4 = DecoderResidualBlock(hidden_channels=64,  output_channels=64,  layers=configs[3])
+
+        self.conv5 = nn.Sequential(
+            nn.BatchNorm2d(num_features=64),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=7, stride=2, padding=1,
+                               output_padding=1, bias=False),
+        )
+
+        self.gate = nn.Sigmoid()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        # x = self.conv4(x)
+        x = self.conv5(x)
+        x = self.gate(x)
+
+        return x
+
+class SimpleAutoEncoder(nn.Module):
+    def __init__(self, encoder, decoder):
+        super(SimpleAutoEncoder, self).__init__()
+        
+        self.encoder = encoder
+        self.decoder = decoder
+    
+    def forward(self, x):
+        x = self.encoder(x)
+        x = x.reshape((-1,640,5,5))
+        x = self.decoder(x)
+        return x
+
 
 def one_hot(indices, depth):
     """
@@ -42,7 +173,7 @@ def get_model(options):
     elif options.network == 'ResNet':
         if options.dataset == 'miniImageNet' or options.dataset == 'tieredImageNet':
             network = resnet12(avg_pool=False, drop_rate=0.1, dropblock_size=5).cuda()
-            network = torch.nn.DataParallel(network, device_ids=[0, 1, 2, 3])
+            network = torch.nn.DataParallel(network, device_ids=[0, 1])
         else:
             network = resnet12(avg_pool=False, drop_rate=0.1, dropblock_size=2).cuda()
     else:
@@ -124,7 +255,15 @@ if __name__ == '__main__':
                             help='number of episodes per batch')
     parser.add_argument('--eps', type=float, default=0.0,
                             help='epsilon of label smoothing')
-
+    parser.add_argument('--meta-task', dest='meta_task', 
+                            type=lambda x: bool(strtobool(x)),
+                            help='use meta-task regularization')
+    parser.add_argument('--meta-task-lr', type=float, default=5e-4,
+                            help='learning rate for meta-task')
+    parser.add_argument('--meta-task-lr-scheduler', dest='meta_task_lr_scheduler', 
+                            type=lambda x: bool(strtobool(x)),
+                            help='use meta-task regularization')
+    
     opt = parser.parse_args()
     
     (dataset_train, dataset_val, data_loader) = get_dataset(opt)
@@ -170,6 +309,18 @@ if __name__ == '__main__':
     lambda_epoch = lambda e: 1.0 if e < 20 else (0.06 if e < 40 else 0.012 if e < 50 else (0.0024))
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_epoch, last_epoch=-1)
 
+    # meta-task autoencoder
+    if opt.meta_task:
+        autoencoder = SimpleAutoEncoder(embedding_net, ResNet12Decoder()).cuda()
+        autoencoder = torch.nn.DataParallel(autoencoder, device_ids=[0, 1])
+        criterion = nn.MSELoss()
+
+        optim = torch.optim.Adam(autoencoder.parameters(),
+                                    lr=opt.meta_task_lr)
+        if opt.meta_task_lr_scheduler:
+            lambda_epoch = lambda e: 1.0 if e < 20 else 0.5 if e < 40 else 0.05
+            meta_scheduler = torch.optim.lr_scheduler.LambdaLR(optim, lr_lambda=lambda_epoch, last_epoch=-1)
+
     max_val_acc = 0.0
 
     timer = Timer()
@@ -178,6 +329,7 @@ if __name__ == '__main__':
     for epoch in range(1, opt.num_epoch + 1):
         # Train on the training split
         lr_scheduler.step()
+        if opt.meta_task_lr_scheduler and opt.meta_task: meta_scheduler.step()
         
         # Fetch the current epoch's learning rate
         epoch_learning_rate = 0.1
@@ -198,10 +350,22 @@ if __name__ == '__main__':
             train_n_support = opt.train_way * opt.train_shot
             train_n_query = opt.train_way * opt.train_query
 
-            emb_support = embedding_net(data_support.reshape([-1] + list(data_support.shape[-3:])))
+            data_support = data_support.reshape([-1] + list(data_support.shape[-3:]))
+            data_query = data_query.reshape([-1] + list(data_query.shape[-3:]))
+
+            if opt.meta_task:
+                data = torch.cat((data_support, data_query),0)
+                recon = autoencoder(data)
+                error = criterion(recon, data)
+
+                optim.zero_grad()
+                error.backward()
+                optim.step()
+
+            emb_support = embedding_net(data_support)
             emb_support = emb_support.reshape(opt.episodes_per_batch, train_n_support, -1)
             
-            emb_query = embedding_net(data_query.reshape([-1] + list(data_query.shape[-3:])))
+            emb_query = embedding_net(data_query)
             emb_query = emb_query.reshape(opt.episodes_per_batch, train_n_query, -1)
             
             logit_query = cls_head(emb_query, emb_support, labels_support, opt.train_way, opt.train_shot)
