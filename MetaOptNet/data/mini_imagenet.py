@@ -27,7 +27,7 @@ from pdb import set_trace as breakpoint
 
 
 # Set the appropriate paths of the datasets here.
-_MINI_IMAGENET_DATASET_DIR = '/efs/data/miniimagenet/kwonl/data/miniImageNet_numpy'
+_MINI_IMAGENET_DATASET_DIR = '../datasets/mini_imagenet'
 
 def buildLabelIndex(labels):
     label2inds = {}

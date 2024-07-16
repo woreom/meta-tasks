@@ -27,7 +27,7 @@ from pdb import set_trace as breakpoint
 
 
 # Set the appropriate paths of the datasets here.
-_FC100_DATASET_DIR = '/mnt/cube/datasets/few-shot/FC100'
+_FC100_DATASET_DIR = '../datasets/FC100'
 
 def buildLabelIndex(labels):
     label2inds = {}
