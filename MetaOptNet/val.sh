@@ -1,0 +1,32 @@
+#!/bin/zsh
+
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_57.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_58.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_59.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_61.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_62.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_63.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_68.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_69.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_71.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_72.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_77.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_78.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_79.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_81.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_82.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_83.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_88.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_89.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_91.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_92.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_97.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_98.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_99.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_101.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_102.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_103.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_108.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_109.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_111.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
+python test.py --gpu 0,1 --load ./experiments/tieredImageNet_MetaOptNet_SVM/Epoch_112.pth --way 5 --shot 1 --query 10 --head SVM --dataset tieredImageNet --network ResNet
