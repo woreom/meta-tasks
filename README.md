@@ -23,7 +23,7 @@ conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 -c pytorch
 
 Experiments results can be seen in 'results_comparing.xslx' and 'results_comparing_2.xslx'
 
-Most implementations are in the folder `prototypical_networks_with_autoencoders`. The `py` files are the implementations and `ipynb files are for testing. 
+Most implementations are in the folder `prototypical_networks_with_autoencoders.` The `py` files are the implementations, and the `ipynb files are for testing. 
 
 --------
 
@@ -34,13 +34,13 @@ prototypical network -> meta-learning implementation of a prototypical network b
 
 autoencoder_prtotypical -> This is the implementation of our idea.
 
-base -> Was a backup code framework that I changed after week 2 and just saved as a back, its primary purpose is a simple prototypical network.
+Base -> This was a backup code framework that I changed after week two and saved as a backup. Its primary purpose is a simple prototypical network.
 
 ## Testing
 For General use, you must first train an autoencoder as a backbone and then train the few-shot classifier (Prototypical Classifier).
 
-For recreating the results from the paper you must first train an autoencoder in `prototypical_networks_with_autoencoders/autoencoder.ipynb` and then use it to train the model in `prototypical_networks_with_autoencoders/autoencoder_prototypical_network.ipynb`.
+To recreate the paper's results, you must first train an autoencoder in `prototypical_networks_with_autoencoders/autoencoder.ipynb` and then use it to train the model in `prototypical_networks_with_autoencoders/autoencoder_prototypical_network.ipynb`.
 
-To compare this paper's results with the normal Prototypical Network, you can train your encoder with `prototypical_networks_with_autoencoders/prototypical_network.ipynb`
+To compare this paper's results with the average Prototypical Network, you can train your encoder with `prototypical_networks_with_autoencoders/prototypical_network.ipynb.`
 
 
