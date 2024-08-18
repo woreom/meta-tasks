@@ -50,56 +50,35 @@ def load_data(file):
             u.encoding = 'latin1'
             data = u.load()
         return data
+    
+def loadFolder(path):
+        """
+        return a dict saving the information of csv
+        :param splitFile: csv file name
+        :return: {label:[file1, file2 ...]}
+        """
+        dataset = datasets.ImageFolder(root=path)
+        imgs = []
+        labels = []
+        for (filename, label_index) in dataset.samples:
+            label = dataset.classes[label_index]
+            imgs.append(filename)
+            labels.append(label_index)
+       
+        return imgs, labels
+
 
 class tieredImageNet(data.Dataset):
     def __init__(self, phase='train', do_not_use_random_transf=False):
 
         assert(phase=='train' or phase=='val' or phase=='test')
         self.phase = phase
-        self.name = 'tieredImageNet_' + phase
-
-        print('Loading tiered ImageNet dataset - phase {0}'.format(phase))
-        file_train_categories_train_phase = os.path.join(
-            _TIERED_IMAGENET_DATASET_DIR,
-            'train_images.npz')
-        label_train_categories_train_phase = os.path.join(
-            _TIERED_IMAGENET_DATASET_DIR,
-            'train_labels.pkl')
-        file_train_categories_val_phase = os.path.join(
-            _TIERED_IMAGENET_DATASET_DIR,
-            'train_images.npz')
-        label_train_categories_val_phase = os.path.join(
-            _TIERED_IMAGENET_DATASET_DIR,
-            'train_labels.pkl')
-        file_train_categories_test_phase = os.path.join(
-            _TIERED_IMAGENET_DATASET_DIR,
-            'train_images.npz')
-        label_train_categories_test_phase = os.path.join(
-            _TIERED_IMAGENET_DATASET_DIR,
-            'train_labels.pkl')
-
-        file_val_categories_val_phase = os.path.join(
-            _TIERED_IMAGENET_DATASET_DIR,
-            'val_images.npz')
-        label_val_categories_val_phase = os.path.join(
-            _TIERED_IMAGENET_DATASET_DIR,
-            'val_labels.pkl')
-        file_test_categories_test_phase = os.path.join(
-            _TIERED_IMAGENET_DATASET_DIR,
-            'test_images.npz')
-        label_test_categories_test_phase = os.path.join(
-            _TIERED_IMAGENET_DATASET_DIR,
-            'test_labels.pkl')
         
         if self.phase=='train':
             # During training phase we only load the training phase images
             # of the training categories (aka base categories).
-            data_train = load_data(label_train_categories_train_phase)
-            #self.data = data_train['data']
-            self.labels = data_train['labels']
-            self.data = np.load(file_train_categories_train_phase)['images']#np.array(load_data(file_train_categories_train_phase))
-            #self.labels = load_data(file_train_categories_train_phase)#data_train['labels']
-
+            self.data, self.labels = loadFolder(_TIERED_IMAGENET_DATASET_DIR+'/train/')
+            
             self.label2ind = buildLabelIndex(self.labels)
             self.labelIds = sorted(self.label2ind.keys())
             self.num_cats = len(self.labelIds)
@@ -107,42 +86,19 @@ class tieredImageNet(data.Dataset):
             self.num_cats_base = len(self.labelIds_base)
 
         elif self.phase=='val' or self.phase=='test':
-            if self.phase=='test':
-                # load data that will be used for evaluating the recognition
-                # accuracy of the base categories.
-                data_base = load_data(label_train_categories_test_phase)
-                data_base_images = np.load(file_train_categories_test_phase)['images']
-                
-                # load data that will be use for evaluating the few-shot recogniton
-                # accuracy on the novel categories.
-                data_novel = load_data(label_test_categories_test_phase)
-                data_novel_images = np.load(file_test_categories_test_phase)['images']
-            else: # phase=='val'
-                # load data that will be used for evaluating the recognition
-                # accuracy of the base categories.
-                data_base = load_data(label_train_categories_val_phase)
-                data_base_images = np.load(file_train_categories_val_phase)['images']
-                #print (data_base_images)
-                #print (data_base_images.shape)
-                # load data that will be use for evaluating the few-shot recogniton
-                # accuracy on the novel categories.
-                data_novel = load_data(label_val_categories_val_phase)
-                data_novel_images = np.load(file_val_categories_val_phase)['images']
-
-            self.data = np.concatenate(
-                [data_base_images, data_novel_images], axis=0)
-            self.labels = data_base['labels'] + data_novel['labels']
+            # load data that will be used for evaluating the recognition
+            # accuracy of the base categories.
+            self.data, self.labels = loadFolder(_TIERED_IMAGENET_DATASET_DIR+f'/{self.phase}/')
 
             self.label2ind = buildLabelIndex(self.labels)
             self.labelIds = sorted(self.label2ind.keys())
             self.num_cats = len(self.labelIds)
 
-            self.labelIds_base = buildLabelIndex(data_base['labels']).keys()
-            self.labelIds_novel = buildLabelIndex(data_novel['labels']).keys()
+            self.labelIds_base = []
+            self.labelIds_novel = self.labelIds
             self.num_cats_base = len(self.labelIds_base)
             self.num_cats_novel = len(self.labelIds_novel)
             intersection = set(self.labelIds_base) & set(self.labelIds_novel)
-            print (intersection)
             assert(len(intersection) == 0)
         else:
             raise ValueError('Not valid phase {0}'.format(self.phase))
@@ -171,7 +127,7 @@ class tieredImageNet(data.Dataset):
         img, label = self.data[index], self.labels[index]
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
-        img = Image.fromarray(img)
+        img = Image.open(img)
         if self.transform is not None:
             img = self.transform(img)
         return img, label
@@ -259,6 +215,7 @@ class FewShotDataloader():
         # return sample_size unique categories chosen from labelIds set of
         # categories (that can be either self.labelIds_base or self.labelIds_novel)
         # Note: random.sample samples elements without replacement.
+        # print(labelIds)
         return random.sample(labelIds, sample_size)
 
     def sample_base_and_novel_categories(self, nKbase, nKnovel):
@@ -280,6 +237,7 @@ class FewShotDataloader():
             assert(nKnovel <= self.dataset.num_cats_novel)
             # sample from the set of base categories 'nKbase' number of base
             # categories.
+            # print(nKbase, nKnovel)
             Kbase = sorted(self.sampleCategories('base', nKbase))
             # sample from the set of novel categories 'nKnovel' number of novel
             # categories.
@@ -388,6 +346,7 @@ class FewShotDataloader():
         nExemplars = self.nExemplars
 
         Kbase, Knovel = self.sample_base_and_novel_categories(nKbase, nKnovel)
+        # print(Kbase, Knovel)
         Tbase = self.sample_test_examples_for_base_categories(Kbase, nTestBase)
         Tnovel, Exemplars = self.sample_train_and_test_examples_for_novel_categories(
             Knovel, nTestNovel, nExemplars, nKbase)

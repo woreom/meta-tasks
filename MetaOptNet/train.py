@@ -11,8 +11,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
-from torchvision import datasets, transforms
+from torchvision import transforms
 
+
+# import datasets
 from models.classification_heads import ClassificationHead
 from models.R2D2_embedding import R2D2Embedding
 from models.protonet_embedding import ProtoNetEmbedding
@@ -105,7 +107,7 @@ class DecoderResidualBlock(nn.Module):
         return x
 
 class ResNet12Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, kernel_size=7,):
         super(ResNet12Decoder, self).__init__()
         configs = [1, 2, 2, 2]
         # self.linear = nn.Linear(in_features=512, out_features=512*3*3)
@@ -117,7 +119,7 @@ class ResNet12Decoder(nn.Module):
         self.conv5 = nn.Sequential(
             nn.BatchNorm2d(num_features=64),
             nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=7, stride=2, padding=1,
+            nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=kernel_size, stride=2, padding=1,
                                output_padding=1, bias=False),
         )
 
@@ -134,15 +136,16 @@ class ResNet12Decoder(nn.Module):
         return x
 
 class SimpleAutoEncoder(nn.Module):
-    def __init__(self, encoder, decoder):
+    def __init__(self, encoder, decoder, reshape_size=(-1,640,5,5)):
         super(SimpleAutoEncoder, self).__init__()
+        self.reshape_size = reshape_size
         
         self.encoder = encoder
         self.decoder = decoder
     
     def forward(self, x):
         x = self.encoder(x)
-        x = x.reshape((-1,640,5,5))
+        x = x.reshape(self.reshape_size)
         x = self.decoder(x)
         return x
 
@@ -173,7 +176,7 @@ def get_model(options):
     elif options.network == 'ResNet':
         if options.dataset == 'miniImageNet' or options.dataset == 'tieredImageNet':
             network = resnet12(avg_pool=False, drop_rate=0.1, dropblock_size=5).cuda()
-            network = torch.nn.DataParallel(network, device_ids=[0, 1])
+            network = torch.nn.DataParallel(network, device_ids=[int(i) for i in opt.gpu.replace(" ","").split(',')])
         else:
             network = resnet12(avg_pool=False, drop_rate=0.1, dropblock_size=2).cuda()
     else:
@@ -280,7 +283,7 @@ if __name__ == '__main__':
         num_workers=4,
         epoch_size=opt.episodes_per_batch * 1000, # num of batches per epoch
     )
-
+    
     dloader_val = data_loader(
         dataset=dataset_val,
         nKnovel=opt.test_way,
@@ -301,18 +304,46 @@ if __name__ == '__main__':
     log(log_file_path, str(vars(opt)))
 
     (embedding_net, cls_head) = get_model(opt)
+
+    # Load saved model checkpoints
+    saved_models = torch.load('./experiments/tieredImageNet_MetaOptNet_meta-task/Epoch_211.pth')
+
+    try:
+        embedding_net.load_state_dict(saved_models['embedding'])
+        embedding_net.eval()
+        cls_head.load_state_dict(saved_models['head'])
+        cls_head.eval()
+    
+    except Exception as e:
+
+        new_state_dict = OrderedDict()
+        new_state_dict['embedding'] = OrderedDict()
+        for k, v in saved_models['embedding'].items():
+            name = k[7:] # remove `module.`
+            new_state_dict['embedding'][name] = v
+
+        new_state_dict['head'] = saved_models['head']
+        
+        embedding_net.load_state_dict(new_state_dict['embedding'])
+        embedding_net.eval()
+        cls_head.load_state_dict(new_state_dict['head'])
+        cls_head.eval()
+    
     
     optimizer = torch.optim.SGD([{'params': embedding_net.parameters()}, 
                                  {'params': cls_head.parameters()}], lr=0.1, momentum=0.9, \
                                           weight_decay=5e-4, nesterov=True)
     
-    lambda_epoch = lambda e: 1.0 if e < 20 else (0.06 if e < 40 else 0.012 if e < 50 else (0.0024))
+    # lambda_epoch = lambda e: 1.0 if e < 20 else (0.06 if e < 40 else 0.012 if e < 50 else (0.0024))
+    lambda_epoch = lambda e: 0.012
     lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_epoch, last_epoch=-1)
 
     # meta-task autoencoder
     if opt.meta_task:
-        autoencoder = SimpleAutoEncoder(embedding_net, ResNet12Decoder()).cuda()
-        autoencoder = torch.nn.DataParallel(autoencoder, device_ids=[0, 1])
+        kernel_size = 7 if opt.dataset == 'miniImageNet' or "tieredImageNet" else 3
+        reshape_size = (-1,640,5,5) if opt.dataset == 'miniImageNet' or "tieredImageNet" else (-1,640,2,2)
+        autoencoder = SimpleAutoEncoder(embedding_net, ResNet12Decoder(kernel_size=kernel_size), reshape_size=reshape_size).cuda()
+        autoencoder.decoder = torch.nn.DataParallel(autoencoder.decoder, device_ids=[int(i) for i in opt.gpu.replace(" ","").split(',')])
         criterion = nn.MSELoss()
 
         optim = torch.optim.Adam(autoencoder.parameters(),
@@ -326,7 +357,7 @@ if __name__ == '__main__':
     timer = Timer()
     x_entropy = torch.nn.CrossEntropyLoss()
     
-    for epoch in range(1, opt.num_epoch + 1):
+    for epoch in range(211, opt.num_epoch + 211):
         # Train on the training split
         lr_scheduler.step()
         if opt.meta_task_lr_scheduler and opt.meta_task: meta_scheduler.step()
@@ -391,7 +422,7 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
 
-        # Evaluate on the validation split
+        Evaluate on the validation split
         _, _ = [x.eval() for x in (embedding_net, cls_head)]
 
         val_accuracies = []
@@ -424,7 +455,7 @@ if __name__ == '__main__':
         if val_acc_avg > max_val_acc:
             max_val_acc = val_acc_avg
             torch.save({'embedding': embedding_net.state_dict(), 'head': cls_head.state_dict()},\
-                       os.path.join(opt.save_path, 'best_model.pth'))
+                       os.path.join(opt.save_path, f'best_model_{val_acc_avg}.pth'))
             log(log_file_path, 'Validation Epoch: {}\t\t\tLoss: {:.4f}\tAccuracy: {:.2f} ± {:.2f} % (Best)'\
                   .format(epoch, val_loss_avg, val_acc_avg, val_acc_ci95))
         else:
@@ -438,4 +469,7 @@ if __name__ == '__main__':
             torch.save({'embedding': embedding_net.state_dict(), 'head': cls_head.state_dict()}\
                        , os.path.join(opt.save_path, 'epoch_{}.pth'.format(epoch)))
 
+        torch.save({'embedding': embedding_net.state_dict(), 'head': cls_head.state_dict()},\
+                       os.path.join(opt.save_path, f'Epoch_{epoch}.pth'))
+        
         log(log_file_path, 'Elapsed Time: {}/{}\n'.format(timer.measure(), timer.measure(epoch / float(opt.num_epoch))))
