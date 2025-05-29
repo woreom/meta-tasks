@@ -1,4 +1,4 @@
-# Meta-Tasks: An alternative view on Meta-Learning Regularization
+# Meta-Task: A Method-Agnostic Framework for Learning to Regularize in Few-Shot Learning
 --------
 
 This repository is the official PyTorch implementation of the paper "Meta-Tasks: An alternative view on Meta-Learning Regularization" by Mohammad Rostami, Atik Faysal, Huaxia wang, Avimanyu Sahoo, Ryan Antle. 
